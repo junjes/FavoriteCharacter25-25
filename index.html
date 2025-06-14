@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>好きキャラ25額縁シミュレータ（HTML埋め込み用）</title>
+  <style>
+    body { background: transparent; }
+    .frame-area { width: 100%; margin: 0 auto; }
+
+    /* 各行ごとのレイアウト・間隔調整 */
+    .frame-row-top      { display: flex; justify-content: flex-start; margin-bottom: 81px; padding-left: 116px;}
+    .frame-row-mid1     { display: flex; justify-content: flex-start; margin-bottom: 80px; padding-left: 25px;}
+    .frame-row-mid2     { display: flex; justify-content: flex-start; margin-bottom: 81px; padding-left: 25px;}
+    .frame-row-mid3     { display: flex; justify-content: flex-start; margin-bottom: 80px; padding-left: 25px;}
+    .frame-row-mid4     { display: flex; justify-content: flex-start; margin-bottom: 81px; padding-left: 25px;}
+    .frame-row-bottom   { display: flex; justify-content: flex-start; margin-bottom: 0;    padding-left: 25px;}
+
+    /* 枠サイズ・枠同士の横間隔 */
+    .frame-top   { width: 127px; height: 232px; margin-right: 153px; position: relative; display: flex; flex-direction: column; align-items: center;}
+    .frame-row-top .frame-top:last-child { margin-right: 0; }
+
+    .frame-mid, .frame-bottom { width: 124px; height: 175px; margin-right: 64px; position: relative; display: flex; flex-direction: column; align-items: center;}
+    .frame-row-mid1 .frame-mid:last-child,
+    .frame-row-mid2 .frame-mid:last-child,
+    .frame-row-mid3 .frame-mid:last-child,
+    .frame-row-mid4 .frame-mid:last-child,
+    .frame-row-bottom .frame-bottom:last-child { margin-right: 0; }
+
+    /* 画像・テキストエリア */
+    .frame-top img.display-img    { width: 117px; height: 152px; object-fit: cover; border-radius: 8px; margin-top: 12px;}
+    .frame-mid img.display-img,
+    .frame-bottom img.display-img { width: 114px; height: 115px; object-fit: cover; border-radius: 8px; margin-top: 8px;}
+
+    .frame-top input, .frame-top textarea,
+    .frame-mid input, .frame-mid textarea,
+    .frame-bottom input, .frame-bottom textarea { width: 88%; margin: 2px 6%; font-size: 11px; }
+    .edit-btn { position: absolute; right: 8px; top: 112px; z-index: 3; font-size: 12px; padding: 2px 5px; border-radius: 4px; background: #f3f3f3; border: 1px solid #aaa;}
+    .frame-top input, .frame-mid input, .frame-bottom input { height: 20px;}
+    .frame-top textarea, .frame-mid textarea, .frame-bottom textarea { height: 32px; resize: vertical; min-height: 20px;}
+
+    #editor {
+      display:none;
+      position: fixed;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(420px, 96vw);
+      height: min(350px, 85vh);
+      background: #eee;
+      z-index: 9999;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.23);
+    }
+  </style>
+</head>
+<body>
+  <div class="frame-area">
+    <div class="frame-row-top"    id="row-top"></div>
+    <div class="frame-row-mid1"   id="row-mid1"></div>
+    <div class="frame-row-mid2"   id="row-mid2"></div>
+    <div class="frame-row-mid3"   id="row-mid3"></div>
+    <div class="frame-row-mid4"   id="row-mid4"></div>
+    <div class="frame-row-bottom" id="row-bottom"></div>
+  </div>
+
+  <!-- 画像編集ダイアログ -->
+  <div id="editor">
+    <canvas id="editCanvas" width="260" height="160" style="max-width:96vw;max-height:60vh;"></canvas>
+    <input type="range" id="scaleRange" min="0.3" max="2" step="0.01" value="1">
+    <button id="saveEdit">保存</button>
+    <button id="cancelEdit">キャンセル</button>
+    <div style="font-size:11px;color:#333;">画像は上下左右ドラッグで移動／スライダーで拡大縮小</div>
+  </div>
+  <input type="file" id="imgInput" accept="image/*" style="display:none">
+
+  <script>
+    // 行ごとの枠数・各枠のCSSクラス名
+    const rowSettings = [
+      { id:"row-top",    count:3,  frameClass:"frame-top"    },
+      { id:"row-mid1",   count:5,  frameClass:"frame-mid"    },
+      { id:"row-mid2",   count:5,  frameClass:"frame-mid"    },
+      { id:"row-mid3",   count:5,  frameClass:"frame-mid"    },
+      { id:"row-mid4",   count:5,  frameClass:"frame-mid"    },
+      { id:"row-bottom", count:2,  frameClass:"frame-bottom" }
+    ];
+    const localKey = 'sukiChar25FrameCache_boy';
+
+    // --- 初期化ロジックを堅牢化 ---
+    let state = [];
+    try {
+      const stored = JSON.parse(localStorage.getItem(localKey) || '[]');
+      if (Array.isArray(stored)) state = stored;
+    } catch(e) {
+      state = [];
+    }
+    // 必ず25枠分用意
+    const total = rowSettings.reduce((a,b)=>a+b.count,0);
+    if (state.length !== total) {
+      for(let i=state.length; i<total; ++i) state[i]={};
+    }
+
+    function renderFrames() {
+      let idx = 0;
+      rowSettings.forEach(row=>{
+        const container = document.getElementById(row.id);
+        container.innerHTML = "";
+        for(let i=0; i<row.count; ++i,++idx){
+          let s = state[idx] || {};
+          let frameElem = document.createElement('div');
+          frameElem.className = row.frameClass;
+
+          if (s.imgData) {
+            let img = document.createElement('img');
+            img.className = 'display-img';
+            img.src = s.imgData;
+            frameElem.appendChild(img);
+          }
+
+          let btn = document.createElement('button');
+          btn.textContent = s.imgData ? "画像編集" : "画像選択";
+          btn.className = 'edit-btn';
+          btn.onclick = () => selectImage(idx);
+          frameElem.appendChild(btn);
+
+          let charName = document.createElement('input');
+          charName.placeholder = "キャラクター名";
+          charName.value = s.name || '';
+          charName.oninput = e => { state[idx].name = charName.value; saveState(); }
+          frameElem.appendChild(charName);
+
+          let workName = document.createElement('input');
+          workName.placeholder = "作品名";
+          workName.value = s.work || '';
+          workName.oninput = e => { state[idx].work = workName.value; saveState(); }
+          frameElem.appendChild(workName);
+
+          let loveTxt = document.createElement('textarea');
+          loveTxt.placeholder = "壁紙年数、グッズ･課金金額、こじらせエピソード等";
+          loveTxt.value = s.love || '';
+          loveTxt.oninput = e => { state[idx].love = loveTxt.value; saveState(); }
+          frameElem.appendChild(loveTxt);
+
+          container.appendChild(frameElem);
+        }
+      });
+    }
+
+    // --- 画像選択・編集ダイアログ ---
+    function selectImage(idx) {
+      window._editFrameIdx = idx;
+      document.getElementById('imgInput').click();
+    }
+    document.getElementById('imgInput').onchange = function(e){
+      const file = this.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(ev){
+        openEditor(ev.target.result, window._editFrameIdx);
+      };
+      reader.readAsDataURL(file);
+      this.value = '';
+    };
+
+    function openEditor(src, idx) {
+      const editor = document.getElementById('editor');
+      editor.style.display = 'flex';
+      const canvas = document.getElementById('editCanvas');
+      const ctx = canvas.getContext('2d');
+      let img = new window.Image();
+      let scale = 1, offsetX = 0, offsetY = 0;
+      img.onload = function(){
+        draw();
+      };
+      img.src = src;
+      function draw(){
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+        let w = img.width*scale, h = img.height*scale;
+        let x = (canvas.width-w)/2+offsetX;
+        let y = (canvas.height-h)/2+offsetY;
+        ctx.drawImage(img, x, y, w, h);
+      }
+      document.getElementById('scaleRange').oninput = function(){
+        scale = parseFloat(this.value); draw();
+      };
+      let drag = false, startX, startY;
+      canvas.onmousedown = function(e){
+        drag = true; startX = e.offsetX; startY = e.offsetY;
+      };
+      canvas.onmouseup = canvas.onmouseleave = ()=>{ drag = false; };
+      canvas.onmousemove = function(e){
+        if (!drag) return;
+        offsetX += e.offsetX-startX; offsetY += e.offsetY-startY;
+        startX = e.offsetX; startY = e.offsetY;
+        draw();
+      };
+      document.getElementById('saveEdit').onclick = function(){
+        if (!state[idx]) state[idx] = {};
+        // 画像サイズは表示用に合わせて切り抜く（枠サイズ114x115固定）
+        const outW = 114, outH = 115;
+        const outCanvas = document.createElement('canvas');
+        outCanvas.width = outW; outCanvas.height = outH;
+        const outCtx = outCanvas.getContext('2d');
+        outCtx.drawImage(canvas, 0, 0, outW, outH);
+        state[idx].imgData = outCanvas.toDataURL("image/png");
+        saveState();
+        editor.style.display='none';
+        renderFrames();
+      };
+      document.getElementById('cancelEdit').onclick = function(){
+        editor.style.display = 'none';
+      };
+    }
+
+    function saveState() {
+      if (state.length !== total) {
+        for(let i=state.length; i<total; ++i) state[i]={};
+      }
+      localStorage.setItem(localKey, JSON.stringify(state));
+    }
+
+    renderFrames();
+  </script>
+</body>
+</html>
