@@ -4,40 +4,36 @@
   <meta charset="UTF-8">
   <title>好きキャラ25シミュレータ</title>
   <style>
-    body { background: #fff; }
+    body { background: #191919; }
     .frame-area { width: 100%; margin: 0 auto; }
-    .frame-row-top      { display: flex; justify-content: flex-start; margin-bottom: 81px; padding-left: 116px;}
-    .frame-row-mid1     { display: flex; justify-content: flex-start; margin-bottom: 80px; padding-left: 25px;}
-    .frame-row-mid2     { display: flex; justify-content: flex-start; margin-bottom: 81px; padding-left: 25px;}
-    .frame-row-mid3     { display: flex; justify-content: flex-start; margin-bottom: 80px; padding-left: 25px;}
-    .frame-row-mid4     { display: flex; justify-content: flex-start; margin-bottom: 81px; padding-left: 25px;}
-    .frame-row-bottom   { display: flex; justify-content: flex-start; margin-bottom: 0;    padding-left: 25px;}
-    .frame-top   { width: 127px; height: 232px; margin-right: 153px; position: relative; display: flex; flex-direction: column; align-items: center;}
+    /* 各段ごとの枠レイアウト/間隔 */
+    .frame-row-top      { display: flex; justify-content: flex-start; margin-bottom: 40px; padding-left: 40px;}
+    .frame-row-mid1, .frame-row-mid2, .frame-row-mid3, .frame-row-mid4, .frame-row-bottom
+      { display: flex; justify-content: flex-start; margin-bottom: 20px; padding-left: 25px;}
+    /* 金枠(上段3つ)の実寸サイズ */
+    .frame-top   { width: 127px; height: 232px; margin-right: 40px; position: relative; display: flex; flex-direction: column; align-items: center;}
     .frame-row-top .frame-top:last-child { margin-right: 0; }
-    .frame-mid, .frame-bottom { width: 124px; height: 175px; margin-right: 64px; position: relative; display: flex; flex-direction: column; align-items: center;}
+    /* 銀枠(2段目以降)の実寸サイズ */
+    .frame-mid, .frame-bottom { width: 124px; height: 175px; margin-right: 18px; position: relative; display: flex; flex-direction: column; align-items: center;}
     .frame-row-mid1 .frame-mid:last-child,
     .frame-row-mid2 .frame-mid:last-child,
     .frame-row-mid3 .frame-mid:last-child,
     .frame-row-mid4 .frame-mid:last-child,
     .frame-row-bottom .frame-bottom:last-child { margin-right: 0; }
-    .frame-top img.display-img    { width: 117px; height: 152px; object-fit: cover; border-radius: 8px; margin-top: 12px;}
+    /* 画像表示部分も枠の実寸で */
+    .frame-top img.display-img    { width: 127px; height: 232px; object-fit: cover; border-radius: 8px; margin-top: 0; }
     .frame-mid img.display-img,
-    .frame-bottom img.display-img { width: 114px; height: 115px; object-fit: cover; border-radius: 8px; margin-top: 8px;}
-    .frame-top input, .frame-top textarea,
-    .frame-mid input, .frame-mid textarea,
-    .frame-bottom input, .frame-bottom textarea { width: 88%; margin: 2px 6%; font-size: 11px; }
-    .edit-btn { position: absolute; right: 8px; top: 112px; z-index: 3; font-size: 12px; padding: 2px 5px; border-radius: 4px; background: #f3f3f3; border: 1px solid #aaa;}
-    .frame-top input, .frame-mid input, .frame-bottom input { height: 20px;}
-    .frame-top textarea, .frame-mid textarea, .frame-bottom textarea { height: 32px; resize: vertical; min-height: 20px;}
+    .frame-bottom img.display-img { width: 124px; height: 175px; object-fit: cover; border-radius: 8px; margin-top: 0; }
+    /* ボタンデザイン */
+    .edit-btn { position: absolute; right: 8px; top: 80px; z-index: 3; font-size: 12px; padding: 2px 5px; border-radius: 4px; background: #f3f3f3; border: 1px solid #aaa;}
+    /* 画像編集ダイアログの見た目 */
     #editor {
       display:none;
       position: fixed;
       top: 10px;
       left: 50%;
       transform: translateX(-50%);
-      width: min(420px, 96vw);
-      height: min(350px, 85vh);
-      background: #eee;
+      background: #333;
       z-index: 9999;
       align-items: center;
       justify-content: center;
@@ -49,6 +45,7 @@
 </head>
 <body>
   <div class="frame-area">
+    <!-- 各段の枠を描画するためのdiv。IDで管理 -->
     <div class="frame-row-top"    id="row-top"></div>
     <div class="frame-row-mid1"   id="row-mid1"></div>
     <div class="frame-row-mid2"   id="row-mid2"></div>
@@ -56,40 +53,49 @@
     <div class="frame-row-mid4"   id="row-mid4"></div>
     <div class="frame-row-bottom" id="row-bottom"></div>
   </div>
-
-  <!-- 画像編集ダイアログ -->
   <div id="editor">
-    <canvas id="editCanvas" width="260" height="160" style="max-width:96vw;max-height:60vh;"></canvas>
+    <!-- 編集ダイアログのcanvas（実際の枠サイズごとにJSで切替） -->
+    <canvas id="editCanvas" style="background:#222; display:block; margin:18px auto;"></canvas>
     <input type="range" id="scaleRange" min="0.3" max="2" step="0.01" value="1">
     <button id="saveEdit">保存</button>
     <button id="cancelEdit">キャンセル</button>
-    <div style="font-size:11px;color:#333;">画像は上下左右ドラッグで移動／スライダーで拡大縮小</div>
+    <div style="font-size:11px;color:#eee;">画像はドラッグで移動／スライダーで拡大縮小</div>
   </div>
   <input type="file" id="imgInput" accept="image/*" style="display:none">
 
   <script>
-    // 25枠の設定（男・女はlocalKey名で切り替え可能）
+    // 枠レイアウト設定
     const rowSettings = [
-      { id:"row-top",    count:3,  frameClass:"frame-top"    },
-      { id:"row-mid1",   count:5,  frameClass:"frame-mid"    },
-      { id:"row-mid2",   count:5,  frameClass:"frame-mid"    },
-      { id:"row-mid3",   count:5,  frameClass:"frame-mid"    },
-      { id:"row-mid4",   count:5,  frameClass:"frame-mid"    },
-      { id:"row-bottom", count:2,  frameClass:"frame-bottom" }
+      { id:"row-top",    count:3,  frameClass:"frame-top",    kind:"gold" },     // 上段（金枠）
+      { id:"row-mid1",   count:5,  frameClass:"frame-mid",    kind:"silver" },   // 2段目（銀枠）
+      { id:"row-mid2",   count:5,  frameClass:"frame-mid",    kind:"silver" },   // 3段目（銀枠）
+      { id:"row-mid3",   count:5,  frameClass:"frame-mid",    kind:"silver" },   // 4段目（銀枠）
+      { id:"row-mid4",   count:5,  frameClass:"frame-mid",    kind:"silver" },   // 5段目（銀枠）
+      { id:"row-bottom", count:2,  frameClass:"frame-bottom", kind:"silver" }    // 最下段（銀枠）
     ];
-    const localKey = 'sukiChar25FrameCache_boy';
-    const total = rowSettings.reduce((a,b)=>a+b.count,0);
+    const localKey = 'sukiChar25FrameCache_boy';  // localStorageのキー
+    const total = rowSettings.reduce((a,b)=>a+b.count,0); // 25枠
+
+    // 金枠・銀枠の「実際の画像保存・表示サイズ」
+    const goldFrameSize   = { w: 127, h: 232 };
+    const silverFrameSize = { w: 124, h: 175 };
 
     // --- 状態ロード＆初期化 ---
     let state = [];
     try {
-      const stored = JSON.parse(localStorage.getItem(localKey) || '[]');
-      if (Array.isArray(stored)) state = stored;
-    } catch(e) { state = []; }
-    // 必ず25枠分
+      // localStorageから配列を復元
+      const storedRaw = localStorage.getItem(localKey) || '[]';
+      state = JSON.parse(storedRaw);
+      if (!Array.isArray(state)) throw new Error("state is not array");
+    } catch(e) {
+      // 保存内容が壊れていた場合リセット
+      localStorage.removeItem(localKey);
+      state = [];
+    }
+    // 配列の長さ不足を必ず補う
     while (state.length < total) state.push({});
 
-    // --- 枠を描画する ---
+    // --- 枠を全描画 ---
     function renderFrames() {
       let idx = 0;
       rowSettings.forEach(row => {
@@ -97,78 +103,63 @@
         container.innerHTML = "";
         for(let i=0; i<row.count; ++i,++idx){
           let s = state[idx] || {};
-          // debug: 画像データ表示
-          console.log("render", idx, !!s.imgData, s);
-
           let frameElem = document.createElement('div');
           frameElem.className = row.frameClass;
-
-          // 画像をセット
+          // 画像（保存済みなら表示）
           if (s.imgData) {
             let img = document.createElement('img');
             img.className = 'display-img';
             img.src = s.imgData;
             frameElem.appendChild(img);
           }
-
-          // ボタン
+          // 画像選択・編集ボタン
           let btn = document.createElement('button');
           btn.textContent = s.imgData ? "画像編集" : "画像選択";
           btn.className = 'edit-btn';
-          btn.onclick = () => selectImage(idx);
+          btn.onclick = () => selectImage(idx, row.kind);
           frameElem.appendChild(btn);
-
-          // 名前・作品名・エピソード欄
-          let charName = document.createElement('input');
-          charName.placeholder = "キャラクター名";
-          charName.value = s.name || '';
-          charName.oninput = () => { state[idx].name = charName.value; saveState(); };
-          frameElem.appendChild(charName);
-
-          let workName = document.createElement('input');
-          workName.placeholder = "作品名";
-          workName.value = s.work || '';
-          workName.oninput = () => { state[idx].work = workName.value; saveState(); };
-          frameElem.appendChild(workName);
-
-          let loveTxt = document.createElement('textarea');
-          loveTxt.placeholder = "壁紙年数、グッズ･課金金額、こじらせエピソード等";
-          loveTxt.value = s.love || '';
-          loveTxt.oninput = () => { state[idx].love = loveTxt.value; saveState(); };
-          frameElem.appendChild(loveTxt);
-
           container.appendChild(frameElem);
         }
       });
     }
 
-    // 画像選択→編集
-    function selectImage(idx) {
+    // --- 画像選択処理 ---
+    function selectImage(idx, kind) {
       window._editFrameIdx = idx;
+      window._editKind = kind; // 金枠 or 銀枠
       document.getElementById('imgInput').click();
     }
+    // 画像ファイルが選択された時
     document.getElementById('imgInput').onchange = function(e){
       const file = this.files[0];
       if (!file) return;
       const reader = new FileReader();
       reader.onload = function(ev){
-        openEditor(ev.target.result, window._editFrameIdx);
+        openEditor(ev.target.result, window._editFrameIdx, window._editKind);
       };
       reader.readAsDataURL(file);
       this.value = '';
     };
 
-    // 編集ダイアログ
-    function openEditor(src, idx) {
+    // --- 拡大縮小トリミング・編集ダイアログ ---
+    function openEditor(src, idx, kind) {
       const editor = document.getElementById('editor');
       editor.style.display = 'flex';
+      // 枠ごとのサイズにcanvasを切り替え
+      const sz = (kind === "gold") ? goldFrameSize : silverFrameSize;
       const canvas = document.getElementById('editCanvas');
+      canvas.width = sz.w;
+      canvas.height = sz.h;
+      canvas.style.width = sz.w + "px";
+      canvas.style.height = sz.h + "px";
       const ctx = canvas.getContext('2d');
+
       let img = new window.Image();
       let scale = 1, offsetX = 0, offsetY = 0;
       img.onload = function(){ draw(); };
       img.src = src;
 
+      // canvas上の画像描画（scale/移動反映）
       function draw(){
         ctx.clearRect(0,0,canvas.width,canvas.height);
         let w = img.width*scale, h = img.height*scale;
@@ -176,9 +167,11 @@
         let y = (canvas.height-h)/2+offsetY;
         ctx.drawImage(img, x, y, w, h);
       }
+      // スライダーによる拡大縮小
       document.getElementById('scaleRange').oninput = function(){
         scale = parseFloat(this.value); draw();
       };
+      // canvasドラッグによる移動
       let drag = false, startX, startY;
       canvas.onmousedown = function(e){
         drag = true; startX = e.offsetX; startY = e.offsetY;
@@ -190,33 +183,27 @@
         startX = e.offsetX; startY = e.offsetY;
         draw();
       };
+      // 保存ボタンでトリミング領域だけJPEG保存
       document.getElementById('saveEdit').onclick = function(){
-        if (!state[idx]) state[idx] = {};
-        // 切り抜き（ここは枠サイズで調整可能）
-        const outW = 114, outH = 115;
-        const outCanvas = document.createElement('canvas');
-        outCanvas.width = outW; outCanvas.height = outH;
-        const outCtx = outCanvas.getContext('2d');
-        outCtx.drawImage(canvas, 0, 0, outW, outH);
-        state[idx].imgData = outCanvas.toDataURL("image/png");
-        console.log("保存実行", idx, state[idx].imgData.slice(0,50)); // 50文字だけ表示
+        if (!state[idx]) state[idx] = {}; // 保険
+        state[idx].imgData = canvas.toDataURL("image/jpeg", 0.7); // 容量小さく
         saveState();
         editor.style.display='none';
         renderFrames();
       };
+      // キャンセル
       document.getElementById('cancelEdit').onclick = function(){
         editor.style.display = 'none';
       };
     }
 
-    // 状態保存
+    // --- 状態をlocalStorageに保存 ---
     function saveState() {
-      // 25枠必ず埋める
       while (state.length < total) state.push({});
       localStorage.setItem(localKey, JSON.stringify(state));
     }
 
-    // 初回
+    // --- ページ初回描画 ---
     renderFrames();
   </script>
 </body>
